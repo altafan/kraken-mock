@@ -8,9 +8,11 @@ import (
 	"math/big"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/spf13/viper"
 )
 
 type order struct {
@@ -42,6 +44,12 @@ type response struct {
 	Fee    float64 `json:"fee"`
 	Price  float64 `json:"price"`
 	Cost   float64 `json:"cost"`
+}
+
+type balanceResponse struct {
+	// error : array of strings
+	Error  []string           `json:"error"`
+	Result map[string]float64 `json:"result"`
 }
 
 var orders = make(map[string]*order)
@@ -167,13 +175,71 @@ func queryOrders(w http.ResponseWriter, r *http.Request) {
 	w.Write(res)
 }
 
+func getBalance(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	balances := getBalancesFromConfig(w)
+
+	if balances == nil {
+		res, _ := json.Marshal(`{"error": ["bad request"]}`)
+		http.Error(w, string(res), http.StatusInternalServerError)
+		return
+	}
+
+	for k, v := range balances {
+		delete(balances, k)
+		balances[strings.ToUpper(k)] = v
+	}
+
+	response := balanceResponse{
+		Error:  []string{},
+		Result: balances,
+	}
+
+	res, err := json.Marshal(response)
+	if err != nil {
+		res, _ := json.Marshal(`{"error": ["bad request"]}`)
+		http.Error(w, string(res), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(res)
+}
+
 func main() {
 	http.HandleFunc("/0/private/AddOrder", newOrder)
 	http.HandleFunc("/0/private/QueryOrders", queryOrders)
+	http.HandleFunc("/0/private/Balance", getBalance)
 	http.ListenAndServe(":7777", nil)
 }
 
 func randomIntInRange(min, max int) int {
 	n, _ := rand.Int(rand.Reader, big.NewInt(int64(max)))
 	return int(int(n.Int64())) + min
+}
+
+func getBalancesFromConfig(w http.ResponseWriter) map[string]float64 {
+
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		res, _ := json.Marshal(`{"error": ["bad request"]}`)
+		http.Error(w, string(res), http.StatusInternalServerError)
+		return nil
+	}
+
+	balances := make(map[string]float64)
+	err = viper.UnmarshalKey("balances", &balances)
+	if err != nil {
+		res, _ := json.Marshal(`{"error": ["bad request"]}`)
+		http.Error(w, string(res), http.StatusInternalServerError)
+		return nil
+	}
+
+	return balances
 }
