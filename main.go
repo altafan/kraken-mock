@@ -209,7 +209,7 @@ func getBalance(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	fmt.Println("kraken mock server started")
+	fmt.Println("started listening to :7777")
 	http.HandleFunc("/0/private/AddOrder", newOrder)
 	http.HandleFunc("/0/private/QueryOrders", queryOrders)
 	http.HandleFunc("/0/private/Balance", getBalance)
