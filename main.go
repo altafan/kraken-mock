@@ -178,12 +178,9 @@ func queryOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func getBalance(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-
-	balances := getBalancesFromConfig(w)
-
-	if balances == nil {
-		res, _ := json.Marshal(`{"error": ["bad request"]}`)
+	balances, err := getBalancesFromConfig()
+	if err != nil {
+		res, _ := json.Marshal(fmt.Sprintf(`{"error": "%s"}`, err))
 		http.Error(w, string(res), http.StatusInternalServerError)
 		return
 	}
@@ -200,10 +197,50 @@ func getBalance(w http.ResponseWriter, r *http.Request) {
 
 	res, err := json.Marshal(response)
 	if err != nil {
-		res, _ := json.Marshal(`{"error": ["bad request"]}`)
+		res, _ := json.Marshal(`{"error": "bad request"}`)
 		http.Error(w, string(res), http.StatusInternalServerError)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(res)
+}
+
+func getAddress(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	buf, err := io.ReadAll(r.Body)
+	if err != nil {
+		res, _ := json.Marshal(`{"error": "bad request"}`)
+		http.Error(w, string(res), http.StatusInternalServerError)
+		return
+	}
+
+	body := make(map[string]interface{})
+	if err := json.Unmarshal(buf, &body); err != nil {
+		res, _ := json.Marshal(`{"error": "bad request"}`)
+		http.Error(w, string(res), http.StatusInternalServerError)
+		return
+	}
+
+	asset := body["asset"].(string)
+	addr, err := getAddressFromConfig(asset)
+	if err != nil {
+		res, _ := json.Marshal(fmt.Sprintf(`{"error": "%s"}`, err))
+		http.Error(w, string(res), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"error": []interface{}{},
+		"result": []map[string]string{
+			{
+				"address": addr,
+			},
+		},
+	}
+
+	res, _ := json.Marshal(response)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -215,6 +252,7 @@ func main() {
 	http.HandleFunc("/0/private/AddOrder", newOrder)
 	http.HandleFunc("/0/private/QueryOrders", queryOrders)
 	http.HandleFunc("/0/private/Balance", getBalance)
+	http.HandleFunc("/0/private/DepositAddresses", getAddress)
 	http.ListenAndServe(":7777", nil)
 }
 
@@ -223,26 +261,45 @@ func randomIntInRange(min, max int) int {
 	return int(int(n.Int64())) + min
 }
 
-func getBalancesFromConfig(w http.ResponseWriter) map[string]float64 {
-
+func getBalancesFromConfig() (map[string]float64, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		res, _ := json.Marshal(`{"error": ["bad request"]}`)
-		http.Error(w, string(res), http.StatusInternalServerError)
-		return nil
+		return nil, err
 	}
 
 	balances := make(map[string]float64)
 	err = viper.UnmarshalKey("balances", &balances)
 	if err != nil {
-		res, _ := json.Marshal(`{"error": ["bad request"]}`)
-		http.Error(w, string(res), http.StatusInternalServerError)
-		return nil
+		return nil, err
 	}
 
-	return balances
+	return balances, nil
+}
+
+func getAddressFromConfig(asset string) (string, error) {
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		return "", err
+	}
+
+	addresses := make(map[string]string)
+	err = viper.UnmarshalKey("addresses", &addresses)
+	if err != nil {
+		return "", err
+	}
+
+	addr, ok := addresses[strings.ToLower(asset)]
+	if !ok {
+		return "", fmt.Errorf("address not found for asset %s", asset)
+	}
+
+	return addr, nil
 }

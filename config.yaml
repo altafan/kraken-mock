@@ -8,3 +8,14 @@ balances:
   ZUSD: 171288.6158
   ZEUR: 504861.8946
   CHF: 911.87
+addresses:
+  XBT: "3BHvyT6ptA94dAengGrVd6neumQq1my3D1"
+  XETH: "0x97dc199381f26d28fb4b1327ff7646e8df84e96e"
+  MATIC: "0x97dc199381f26d28fb4b1327ff7646e8df84e96e"
+  TRX: "TRCqnywp6UyCYZuJBUURpaAtb4QPHhjQpG"
+  DAI: "0x97dc199381f26d28fb4b1327ff7646e8df84e96e"
+  USDT: "0x97dc199381f26d28fb4b1327ff7646e8df84e96e"
+  USDC: "0x97dc199381f26d28fb4b1327ff7646e8df84e96e"
+  EUR: "70 Sir John Rogerson's Quay, Dublin, D02 R296, Ireland"
+  USD: "70 Sir John Rogerson's Quay, Dublin, D02 R296, Ireland"
+  CHF: "70 Sir John Rogerson's Quay, Dublin, D02 R296, Ireland"
