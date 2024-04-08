@@ -31,19 +31,63 @@ func (o *order) String() string {
 	return fmt.Sprintf("%s %f %s @ market", o.Type, o.Volume, o.Pair)
 }
 
-type request struct {
+type newOrderRequest struct {
 	OrderType string  `json:"ordertype"`
 	Type      string  `json:"type"`
 	Volume    float64 `json:"volume"`
 	Pair      string  `json:"pair"`
 }
 
-type response struct {
+func newOrderRequestFromString(str string) newOrderRequest {
+	var orderType, typ, pair string
+	var volume float64
+	args := strings.Split(str, "&")
+	for _, arg := range args {
+		a := strings.Split(arg, "=")
+		switch a[0] {
+		case "orderType":
+			orderType = a[1]
+		case "type":
+			typ = a[1]
+		case "pair":
+			pair = a[1]
+		case "volume":
+			volume, _ = strconv.ParseFloat(a[1], 64)
+		}
+	}
+
+	return newOrderRequest{
+		OrderType: orderType,
+		Type:      typ,
+		Volume:    volume,
+		Pair:      pair,
+	}
+}
+
+type newOrderResponse struct {
 	Status string  `json:"status"`
 	Vol    float64 `json:"vol"`
 	Fee    float64 `json:"fee"`
 	Price  float64 `json:"price"`
 	Cost   float64 `json:"cost"`
+}
+
+type queryOrderRequest struct {
+	Txid string `json:"txid"`
+}
+
+func queryOrderRequestFromString(str string) queryOrderRequest {
+	var txid string
+	args := strings.Split(str, "&")
+	for _, arg := range args {
+		a := strings.Split(arg, "=")
+		switch a[0] {
+		case "txid":
+			txid = a[1]
+		}
+	}
+
+	return queryOrderRequest{Txid: txid}
 }
 
 type balanceResponse struct {
@@ -68,11 +112,9 @@ func newOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req := request{}
+	req := newOrderRequest{}
 	if err := json.Unmarshal(buf, &req); err != nil {
-		res, _ := json.Marshal(`{"error": ["bad request"]}`)
-		http.Error(w, string(res), http.StatusInternalServerError)
-		return
+		req = newOrderRequestFromString(string(buf))
 	}
 
 	order := &order{
@@ -145,21 +187,12 @@ func queryOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req := map[string]interface{}{}
+	req := queryOrderRequest{}
 	if err := json.Unmarshal(buf, &req); err != nil {
-		res, _ := json.Marshal(`{"error": ["bad request"]}`)
-		http.Error(w, string(res), http.StatusInternalServerError)
-		return
+		req = queryOrderRequestFromString(string(buf))
 	}
 
-	id, ok := req["txid"].(string)
-	if !ok {
-		res, _ := json.Marshal(`{"error": ["bad request"]}`)
-		http.Error(w, string(res), http.StatusInternalServerError)
-		return
-	}
-
-	order, ok := orders[id]
+	order, ok := orders[req.Txid]
 	if !ok {
 		http.Error(w, "order not found", http.StatusNotFound)
 		return
@@ -167,7 +200,7 @@ func queryOrders(w http.ResponseWriter, r *http.Request) {
 
 	resp := map[string]interface{}{
 		"result": map[string]interface{}{
-			order.Id: response{
+			order.Id: newOrderResponse{
 				Status: order.Status,
 				Vol:    order.Volume,
 				Fee:    order.Fee,
