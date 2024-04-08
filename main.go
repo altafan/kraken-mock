@@ -161,12 +161,14 @@ func queryOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]interface{}{
-		order.Id: response{
-			Status: order.Status,
-			Vol:    order.Volume,
-			Fee:    order.Fee,
-			Price:  order.Price,
-			Cost:   order.Cost,
+		"result": map[string]interface{}{
+			order.Id: response{
+				Status: order.Status,
+				Vol:    order.Volume,
+				Fee:    order.Fee,
+				Price:  order.Price,
+				Cost:   order.Cost,
+			},
 		},
 	}
 	res, _ := json.Marshal(resp)
