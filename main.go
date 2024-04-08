@@ -52,6 +52,11 @@ type balanceResponse struct {
 	Result map[string]float64 `json:"result"`
 }
 
+type getAddrRequest struct {
+	Asset  string `json:"asset"`
+	Method string `json:"method"`
+}
+
 var orders = make(map[string]*order)
 
 func newOrder(w http.ResponseWriter, r *http.Request) {
@@ -216,14 +221,17 @@ func getAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body := make(map[string]interface{})
+	body := getAddrRequest{}
+	asset := ""
 	if err := json.Unmarshal(buf, &body); err != nil {
-		res, _ := json.Marshal(`{"error": "bad request"}`)
-		http.Error(w, string(res), http.StatusInternalServerError)
-		return
+		reqStr := string(buf)
+		s := strings.Split(reqStr, "&")
+		a := strings.Split(s[0], "=")
+		asset = a[1]
+	} else {
+		asset = body.Asset
 	}
 
-	asset := body["asset"].(string)
 	addr, err := getAddressFromConfig(asset)
 	if err != nil {
 		res, _ := json.Marshal(fmt.Sprintf(`{"error": "%s"}`, err))
