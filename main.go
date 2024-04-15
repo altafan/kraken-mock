@@ -107,7 +107,7 @@ func newOrder(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
-		res, _ := json.Marshal(`{"error": ["bad request"]}`)
+		res, _ := json.Marshal(map[string][]string{"error": {"bad request"}})
 		http.Error(w, string(res), http.StatusInternalServerError)
 		return
 	}
@@ -182,7 +182,7 @@ func queryOrders(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
-		res, _ := json.Marshal(`{"error": ["bad request"]}`)
+		res, _ := json.Marshal(map[string][]string{"error": {"bad request"}})
 		http.Error(w, string(res), http.StatusInternalServerError)
 		return
 	}
@@ -218,7 +218,7 @@ func queryOrders(w http.ResponseWriter, r *http.Request) {
 func getBalance(w http.ResponseWriter, r *http.Request) {
 	balances, err := getBalancesFromConfig()
 	if err != nil {
-		res, _ := json.Marshal(fmt.Sprintf(`{"error": "%s"}`, err))
+		res, _ := json.Marshal(map[string]string{"error": err.Error()})
 		http.Error(w, string(res), http.StatusInternalServerError)
 		return
 	}
@@ -235,7 +235,7 @@ func getBalance(w http.ResponseWriter, r *http.Request) {
 
 	res, err := json.Marshal(response)
 	if err != nil {
-		res, _ := json.Marshal(`{"error": "bad request"}`)
+		res, _ := json.Marshal(map[string]string{"error": "bad request"})
 		http.Error(w, string(res), http.StatusInternalServerError)
 		return
 	}
@@ -249,7 +249,7 @@ func getAddress(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
-		res, _ := json.Marshal(`{"error": "bad request"}`)
+		res, _ := json.Marshal(map[string]string{"error": "bad request"})
 		http.Error(w, string(res), http.StatusInternalServerError)
 		return
 	}
@@ -260,14 +260,22 @@ func getAddress(w http.ResponseWriter, r *http.Request) {
 		reqStr := string(buf)
 		s := strings.Split(reqStr, "&")
 		a := strings.Split(s[0], "=")
-		asset = a[1]
+		if len(a) > 1 {
+			asset = a[1]
+		}
 	} else {
 		asset = body.Asset
 	}
 
+	if asset == "" {
+		res, _ := json.Marshal(map[string]string{"error": "missing asset"})
+		http.Error(w, string(res), http.StatusBadRequest)
+		return
+	}
+
 	addr, err := getAddressFromConfig(asset)
 	if err != nil {
-		res, _ := json.Marshal(fmt.Sprintf(`{"error": "%s"}`, err))
+		res, _ := json.Marshal(map[string]string{"error": err.Error()})
 		http.Error(w, string(res), http.StatusInternalServerError)
 		return
 	}
@@ -277,7 +285,30 @@ func getAddress(w http.ResponseWriter, r *http.Request) {
 		"result": []map[string]string{
 			{
 				"address": addr,
+				"key":     uuid.NewString(),
 			},
+		},
+	}
+
+	res, _ := json.Marshal(response)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(res)
+}
+
+func withdraw(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	if _, err := io.ReadAll(r.Body); err != nil {
+		res, _ := json.Marshal(map[string]string{"error": "bad request"})
+		http.Error(w, string(res), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"error": []interface{}{},
+		"result": map[string]string{
+			"refid": uuid.New().String(),
 		},
 	}
 
@@ -294,6 +325,8 @@ func main() {
 	http.HandleFunc("/0/private/QueryOrders", queryOrders)
 	http.HandleFunc("/0/private/Balance", getBalance)
 	http.HandleFunc("/0/private/DepositAddresses", getAddress)
+	http.HandleFunc("/0/private/WithdrawAddresses", getAddress)
+	http.HandleFunc("/0/private/Withdraw", withdraw)
 	http.ListenAndServe(":7777", nil)
 }
 
