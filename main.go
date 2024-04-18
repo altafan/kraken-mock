@@ -168,8 +168,8 @@ func closeOrder(id string) {
 	for _, vvv := range v["result"].(map[string]interface{}) {
 		i := vvv.(map[string]interface{})
 		price, _ := strconv.ParseFloat(i["c"].([]interface{})[0].(string), 64)
-		fee := orders[id].Volume * 0.1
 		cost := orders[id].Volume * price
+		fee := cost * 0.1
 		orders[id].Cost = cost
 		orders[id].Fee = fee
 		orders[id].Price = price
