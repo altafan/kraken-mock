@@ -25,6 +25,7 @@ type order struct {
 	Fee       float64
 	Price     float64
 	Cost      float64
+	VolExec   float64
 }
 
 func (o *order) String() string {
@@ -65,11 +66,12 @@ func newOrderRequestFromString(str string) newOrderRequest {
 }
 
 type newOrderResponse struct {
-	Status string  `json:"status"`
-	Vol    float64 `json:"vol"`
-	Fee    float64 `json:"fee"`
-	Price  float64 `json:"price"`
-	Cost   float64 `json:"cost"`
+	Status  string  `json:"status"`
+	Vol     float64 `json:"vol"`
+	Fee     float64 `json:"fee"`
+	Price   float64 `json:"price"`
+	Cost    float64 `json:"cost"`
+	VolExec float64 `json:"vol_exec"`
 }
 
 type queryOrderRequest struct {
@@ -169,10 +171,17 @@ func closeOrder(id string) {
 		i := vvv.(map[string]interface{})
 		price, _ := strconv.ParseFloat(i["c"].([]interface{})[0].(string), 64)
 		cost := orders[id].Volume * price
-		fee := cost * 0.1
+		fee := cost * 0.03
+		volExec := orders[id].Volume
+		if strings.ToLower(orders[id].Type) == "buy" {
+			cost = orders[id].Volume
+			volExec = orders[id].Volume / price
+			fee = 0.04
+		}
 		orders[id].Cost = cost
 		orders[id].Fee = fee
 		orders[id].Price = price
+		orders[id].VolExec = volExec
 		orders[id].Status = "closed"
 	}
 	fmt.Printf("order %s closed\n", id)
@@ -201,11 +210,12 @@ func queryOrders(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]interface{}{
 		"result": map[string]interface{}{
 			order.Id: newOrderResponse{
-				Status: order.Status,
-				Vol:    order.Volume,
-				Fee:    order.Fee,
-				Price:  order.Price,
-				Cost:   order.Cost,
+				Status:  order.Status,
+				Vol:     order.Volume,
+				Fee:     order.Fee,
+				Price:   order.Price,
+				Cost:    order.Cost,
+				VolExec: order.VolExec,
 			},
 		},
 	}
